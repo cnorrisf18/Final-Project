@@ -1,60 +1,28 @@
 import turtle
 import random
+from tile import Tiles
+from tax import Tax
+from chest import Chest
+from locations import Locations
+from railroad import Railroads
+from utilities import Utilities
 
-def getPos(x, y):
-    print("(",x , y,")")
-    return
-def drawBoard(comchest, chance, player, comp1, comp2, comp3, board):
-    #set background image
-    board.setup(700, 700, None, None)
-    board.bgpic("board.gif")
-    #draw community chest and chance
-    comchest.color("darkblue")
-    comchest.penup()
-    comchest.begin_fill()
-    comchest.setpos(-227, 133)
-    comchest.pendown()
-    comchest.setpos(-157, 62)
-    comchest.setpos(-56, 159)
-    comchest.setpos(-128, 229)
-    comchest.setpos(-227, 133)
-    comchest.end_fill()
-    chance.color("lightgreen")
-    chance.penup()
-    chance.begin_fill()
-    chance.setpos(128, -231)
-    chance.pendown()
-    chance.setpos(229, -135)
-    chance.setpos(155, -64)
-    chance.setpos(57, -164)
-    chance.setpos(128, -231)
-    chance.end_fill()
-    #set up players
-    player.penup()
-    player.setpos(267, -272)
-    player.pendown()
-    comp1.penup()
-    comp1.setpos(322, -270)
-    comp1.pendown()
-    comp2.penup()
-    comp2.setpos(268, -313)
-    comp2.pendown()
-    comp3.penup()
-    comp3.setpos(326, -320)
-    comp3.pendown()
-    #coord testing (will be removed eventually)
-    #board.onscreenclick(getPos)
-    #board.mainloop()
 class Player(turtle.Turtle):
-    def __init__(self, name, color, shape):
+    def __init__(self, name, color, shape, number2, number4, number3=None):
         super().__init__()
         #fixed
         self.name=name
         self.color(color)
         self.shape(shape)
+        self.number2=number2
+        self.number4=number4
+        self.number3=number3
+        self.x=None
+        self.y=None
+        self.speed(1)
         #changeables
         self.bank=1500
-        self.spaceon=None
+        self.spaceon=Go
         self.injail=False
         self.owned=[]
         self.bankrupt=False
@@ -101,6 +69,8 @@ class Player(turtle.Turtle):
                 self.bank=0
                 self.owned=[]
                 self.bankrupt=True
+                global playerlist
+                playerlist=playerlist-self
                 done = True
                 return
             else:
@@ -108,18 +78,21 @@ class Player(turtle.Turtle):
     def isBankrupt(self):
         return self.bankrupt
     def getBank(self):
+        self.bank=int(self.bank)
         return self.bank
     def buyProperty(self, property):
         origbankname = self.bank
-        self.bank = self.bank - property.sellprice
+        sellprice=property.getSellPrice()
+        self.bank = self.bank - sellprice
         if self.bank <= 0:
             print("You don't have enough money to buy this!")
-            return origbankname
+            self.bank=origbankname
+            return self.bank
         else:
             property.Buy(self)
-            self.owned = self.owned + property
+            self.owned.append(property)
             print("{}, you have successfully bought {}. You have ${} left in the bank.".format(self.name, property,
-                                                                                               self.bank))
+                                                                                               self.getBank()))
             return self.bank
     def buyHouses(self, property, numbought):
         origbankname = self.bank
@@ -141,6 +114,8 @@ class Player(turtle.Turtle):
             return self.bank
     def getTaxed(self, tax):
         self.bank=self.bank - tax.ChargeTax()
+        print("{}, you have been taxed for {}. Your remaining balance is {}.".format(self.name, tax.ChargeTax(),
+                                                                                     self.bank))
         if self.bank <= 0:
             self.goBankrupt()
         return self.bank
@@ -150,6 +125,9 @@ class Player(turtle.Turtle):
         oplayer.bank = oplayer.bank + property.ChargeRent()
         if self.bank <= 0:
             self.goBankrupt()
+        print("{}, you have paid ${} to {} for rent on {}. You have {} left in the bank.".format(self.name,
+              property.ChargeRent(),oplayer.name, property, self.getBank()))
+        print("{}, you now have {} in the bank.".format(oplayer.name, oplayer.getBank()))
         return self.bank, oplayer.bank
     def collectGo(self):
         self.bank = self.bank + 200
@@ -172,343 +150,265 @@ class Player(turtle.Turtle):
         self.bank = self.bank + samount
         print("{}, you sold {} houses, which added ${} to your bank account.".format(self.name, numhouses, samount))
         return self.bank
-class Tiles:
-    #properties
-    def __init__(self,name):
-        #changeables
-        self.owned = False
-        self.canbeowned = False
-        self.hasprice = False
-        self.haspieces = False
-        self.name =name
-    def isOwned(self):
-        return self.owned
-    def isCanbeOwned(self):
-        return self.canbeowned
-    def isHasPrice(self):
-        return self.hasprice
-    def isHasPieces(self):
-        return self.haspieces
-    def __str__(self):
-        print(self.name)
+    def setGo(self):
+        global tile_list
+        self.x=tile_list[Go][self.number4][0]
+        self.y=tile_list[Go][self.number4][1]
+        self.setpos(x=self.x, y=self.y)
+        return
+    def moveTo(self, property):
+        global tile_list
+        global tile_list_x_top
+        global tile_list_y_left
+        global tile_list_y_right
+        global tile_list_x_bot
+        if property in tile_list_x_bot:
+            if self.number3 == None:
+                self.x=tile_list_x_bot[property][self.number2]
+            else:
+                self.x = tile_list_x_bot[property][self.number3]
+            self.y=tile_list_x_bot['y'][self.number2]
+        elif property in tile_list_x_top:
+            if self.number3 == None:
+                self.x = tile_list_x_top[property][self.number2]
+            else:
+                self.x = tile_list_x_top[property][self.number3]
+            self.y = tile_list_x_top['y'][self.number2]
+        elif property in tile_list_y_left:
+            if self.number3 == None:
+                self.y = tile_list_y_left[property][self.number2]
+            else:
+                self.y = tile_list_y_left[property][self.number3]
+            self.x=tile_list_y_left['x'][self.number2]
+        elif property in tile_list_y_right:
+            if self.number3 == None:
+                self.y = tile_list_y_right[property][self.number2]
+            else:
+                self.y = tile_list_y_right[property][self.number3]
+            self.x=tile_list_y_right['x'][self.number2]
+        else:
+            self.x=tile_list[property][self.number4][0]
+            self.y=tile_list[property][self.number4][1]
+        self.setpos(x=self.x, y=self.y)
+        oldspace=self.spaceon
+        oldspace.Leave(self)
+        self.spaceon=property
+        property.Land(self)
+        return
+    def rollDice(self):
+        global tl
+        done = False
+        while not done:
+            dice1 = random.randint(1, 6)
+            dice2 = random.randint(1, 6)
+            dicesum = dice1 + dice2
+            print("{}, you rolled a {} and a {}.".format(self.name, dice1, dice2))
+            on = self.spaceon
+            oldpos = tl.index(on)
+            newpos = oldpos + dicesum
+            if newpos > len(tl):
+                print("{} passed Go.".format(self.name))
+                self.collectGo()
+            newpos = newpos % len(tl)
+            nowon = tl[newpos]
+            self.moveTo(nowon)
+            self.spaceon = nowon
+            land = self.spaceon
+            if land.canbeowned == True:
+                buyProperty(self, land)
+            elif land.canbeowned == False:
+                unownedProperty(self, land)
+            if dice1 == dice2:
+                print("{}, you rolled doubles! Now you get to roll again!".format(self.name))
+            else:
+                done = True
+        return
+class Chance(Tiles):
+    # properties
+    startchancelist = {"Advance to Go":'Go', "Advance to Illinois Ave":'Illinois Avenue',
+                       "Advance to St. Charles Place":'St. Charles Place',
+                       "Advance to a random Utility":1, "Advance to a random Railroad":2, "Bank pays you $50":3,
+                       "Get out of Jail Free":4, "Go back 3 Spaces":5, "Go to Jail":'Jail',
+                       "House Repairs:House-25, Hotel-100":6,
+                       "Poor Tax:$15":6, "Go to Reading Railroad":'Reading RailRoad', "Go to Boardwalk":'Boardwalk',
+                       "Elected Chairman of the Board: Pay each player $50":7,
+                       "Building loan matures, collect $150":8,
+                       "Won crossword competition, collect $100":9}
+    chancelist = {"Advance to Go":'Go', "Advance to Illinois Ave":'Illinois Avenue',
+                       "Advance to St. Charles Place":'St. Charles Place',
+                       "Advance to a random Utility":1, "Advance to a random Railroad":2, "Bank pays you $50":3,
+                       "Get out of Jail Free":4, "Go back 3 Spaces":5, "Go to Jail":'Jail',
+                       "House Repairs:House-25, Hotel-100":6,
+                       "Poor Tax:$15":6, "Go to Reading Railroad":'Reading RailRoad', "Go to Boardwalk":'Boardwalk',
+                       "Elected Chairman of the Board: Pay each player $50":7,
+                       "Building loan matures, collect $150":8,
+                       "Won crossword competition, collect $100":9}
 
-    #methods
-    def Land(self, player1, player2=None, player3=None, player4=None):
-        self.haspieces = True
-        self.playerson = player1, player2, player3, player4
-
-    def Leave(self, player1, player2=None, player3=None, player4=None):
-        self.playerson = self.playerson - player1, player2, player3, player4
-        if self.playerson == None:
-            self.haspieces = False
-class Locations(Tiles):
-
-    #properties
-    def __init__(self, name=None, rentprice = None, sellprice = None, mortgageprice = None, houseprice = None):
-        super().__init__(name=name)
-        #fixed
-        self.canbeowned = True
-        self.hasprice = True
-        self.rentprice = rentprice
-        #rent price will be a list: [1 house, 2 houses, 3 houses, 4 houses, hotel]
-        self.pairs = None
-        self.sellprice = sellprice
-        self.mortgageprice = mortgageprice
-        self.houseprice = houseprice
-        #changeables
-        self.monopoly = False
-        self.hashouses = False
-        self.howmanyhouses = 0
-        self.hashotel = False
-        self.mortgaged = False
-        self.owner = None
-        self.playerson = None
-    def __str__(self):
-        return self.name
-
-    def isOwned(self):
-        return self.owned
-    def isCanbeOwned(self):
-        return self.canbeowned
-    def isHasPrice(self):
-        return self.hasprice
-    def isHasPieces(self):
-        return self.haspieces
-    def getRentPrice(self):
-        return self.rentprice
-    def getPairs(self):
-        return self.pairs
-    def getSellPrice(self):
-        return self.sellprice
-    def getMortgagePrice(self):
-        return self.mortgageprice
-    def isMonopoly(self):
-        return self.monopoly
-    def isHasHouses(self):
-        return self.hashouses
-    def getHowManyHouses(self):
-        return self.howmanyhouses
-    def isHasHotel(self):
-        return self.hashotel
-    def getOwner(self):
-        return self.owner
-    def getPieces(self):
-        return self.playerson
-    def getHousePrice(self):
-        return self.houseprice
-    #methods
-    def Land(self, player1, player2=None, player3=None, player4=None):
-        self.haspieces = True
-        self.playerson = player1, player2, player3, player4
-
-    def Leave(self, player1, player2=None, player3=None, player4=None):
-        self.playerson = self.playerson - player1, player2, player3, player4
-        if self.playerson == None:
-            self.haspieces = False
-    def Buy(self, player1):
-        self.owned = True
-        self.owner = player1
-        return self.sellprice
-    def Sell(self):
-        self.owned = False
-        self.owner = None
-        return self.sellprice
-    def Mortgage(self):
-        self.mortgaged = True
-        return self.mortgageprice
-    def BecomeMonopoly(self):
-        self.monopoly = True
-    def LooseMonopoly(self):
-        self.monopoly = False
-    def BuyHouses(self, numhouses):
-        if self.hashotel == True:
-            raise RuntimeError("You can't buy houses on a property with a hotel.")
-        if self.mortgaged == True:
-            raise RuntimeError("Can't buy houses on a mortgaged property.")
-        if self.monopoly == False:
-            raise RuntimeError("Can only buy houses when you've got the monopoly.")
-        self.howmanyhouses = self.howmanyhouses + numhouses
-        if self.howmanyhouses == 5:
-            self.howmanyhouses = 0
-            self.hashotel = True
-        elif self.howmanyhouses > 5:
-            raise RuntimeError("Can't have more than a hotel.")
-    def SellHouses(self, numhouses):
-        if self.hashotel == True:
-            self.howmanyhouses = 5
-            self.hashotel = False
-        self.howmanyhouses = self.howmanyhouses-numhouses
-        if numhouses > 5:
-            raise RuntimeError("Can't sell more than 5 houses.")
-        if self.howmanyhouses < 0:
-            raise RuntimeError("Can't have less than 0 houses.")
-    def ChargeRent(self):
-        if self.hashotel == True:
-            return self.rentprice[5]
-        return self.rentprice[self.howmanyhouses]
-    def AddPairs(self, in1, in2 = None, in3 = None):
-        self.pairs = [in1, in2, in3]
-        return self.pairs
-class Utilities(Tiles):
-    #properties
-    def __init__(self, name = None,rentprice = None, sellprice = None, mortgageprice = None):
-        super().__init__(name=name)
-        #fixed
-        self.canbeowned = True
-        self.hasprice = True
-        self.rentprice = rentprice
-        self.pairs = None
-        self.sellprice = sellprice
-        self.mortgageprice = mortgageprice
-        #changeables
-        self.monopoly = False
-        self.mortgaged = False
-        self.owner = None
-        self.playerson = None
-    def __str__(self):
-        print(self.name)
-    def isOwned(self):
-        return self.owned
-    def isCanbeOwned(self):
-        return self.canbeowned
-    def isHasPrice(self):
-        return self.hasprice
-    def isHasPieces(self):
-        return self.haspieces
-    def getRentPrice(self):
-        return self.rentprice
-    def getPairs(self):
-        return self.pairs
-    def getSellPrice(self):
-        return self.sellprice
-    def getMortgagePrice(self):
-        return self.mortgageprice
-    def isMonopoly(self):
-        return self.monopoly
-    def getOwner(self):
-        return self.owner
-    def getPieces(self):
-        return self.playerson
-    #methods
-    def Land(self, player1, player2=None, player3=None, player4=None):
-        self.haspieces = True
-        self.playerson = player1, player2, player3, player4
-
-    def Leave(self, player1, player2=None, player3=None, player4=None):
-        self.playerson = self.playerson - player1, player2, player3, player4
-        if self.playerson == None:
-            self.haspieces = False
-    def Buy(self, player1):
-        self.owned = True
-        self.owner = player1
-        return self.sellprice
-    def Sell(self):
-        self.owned = False
-        self.owner = None
-        return self.sellprice
-    def Mortgage(self):
-        self.mortgaged = True
-        return self.mortgageprice
-    def BecomeMonopoly(self):
-        self.monopoly = True
-    def LooseMonopoly(self):
-        self.monopoly = False
-    def ChargeRent(self, numowned):
-        return self.rentprice[numowned - 1]
-    def AddPairs(self, in1, in2=None, in3=None):
-        self.pairs = [in1, in2, in3]
-        return self.pairs
-class Railroads(Tiles):
-    #properties
-    def __init__(self, name=None, rentprice = None, sellprice = None, mortgageprice = None):
-        super().__init__(name=name)
-        self.canbeowned = True
-        self.hasprice = True
-        self.rentprice = rentprice
-        self.pairs = None
-        self.sellprice = sellprice
-        self.mortgageprice = mortgageprice
-        self.name=name
-        # changeables
-        self.monopoly = False
-        self.mortgaged = False
-        self.owner = None
-        self.playerson = None
-    def __str__(self):
-        print(self.name)
-    def isOwned(self):
-        return self.owned
-    def isCanbeOwned(self):
-        return self.canbeowned
-    def isHasPrice(self):
-        return self.hasprice
-    def isHasPieces(self):
-        return self.haspieces
-    def getRentPrice(self):
-        return self.rentprice
-    def getPairs(self):
-        return self.pairs
-    def getSellPrice(self):
-        return self.sellprice
-    def getMortgagePrice(self):
-        return self.mortgageprice
-    def isMonopoly(self):
-        return self.monopoly
-    def getOwner(self):
-        return self.owner
-    def getPieces(self):
-        return self.playerson
-    # methods
-    def Land(self, player1, player2=None, player3=None, player4=None):
-        self.haspieces = True
-        self.playerson = player1, player2, player3, player4
-    def Leave(self, player1, player2=None, player3=None, player4=None):
-        self.playerson = self.playerson - player1, player2, player3, player4
-        if self.playerson== None:
-            self.haspieces = False
-    def Buy(self, player1):
-        self.owned = True
-        self.owner = player1
-        return self.sellprice
-    def Sell(self):
-        self.owned = False
-        self.owner = None
-        return self.sellprice
-    def Mortgage(self):
-        self.mortgaged = True
-        return self.mortgageprice
-    def BecomeMonopoly(self):
-        self.monopoly = True
-    def LooseMonopoly(self):
-        self.monopoly = False
-    def ChargeRent(self, numowned):
-        return self.rentprice[numowned - 1]
-    def AddPairs(self, in1, in2=None, in3=None):
-        self.pairs = [in1, in2, in3]
-        return self.pairs
-class ChanceChest(Tiles):
-    #properties
-    def __init__(self, name = None, numcards = None):
+    def __init__(self, name=None, numcards=None):
         super().__init__(name=name)
         self.startingcards = numcards
         self.numcards = numcards
         self.haspieces = False
         self.playerson = None
-        self.carddescriptions=None
+
     def __str__(self):
         print(self.name)
+
     def isCanbeOwned(self):
         return self.canbeowned
+
     def isHasPrice(self):
         return self.hasprice
+
     def isHasPieces(self):
         return self.haspieces
+
     def getPieces(self):
         return self.playerson
-    #methods
-    def Land(self, player1, player2=None, player3=None, player4=None):
-        self.haspieces = True
-        self.playerson = player1, player2, player3, player4
 
-    def Leave(self, player1, player2=None, player3=None, player4=None):
-        self.playerson = self.playerson - player1, player2, player3, player4
-        if self.playerson == None:
-            self.haspieces = False
-    def DrawCard(self):
+    # methods
+    def DrawCard(self, player):
+        global chancelist
+        global startchancelist
+        global utilities
+        global railroads
+        global classes
         self.numcards = self.numcards - 1
         if self.numcards == 0:
             self.numcards = self.startingcards
-    def AddDescriptions(self, dictionary):
-        self.carddescriptions=dictionary
-        return self.carddescriptions
-class Tax(Tiles):
-    #properties
-    def __init__(self, name =None, taxprice = None):
-        super().__init__(name=name)
-        self.taxprice = taxprice
-    def __str__(self):
-        print(self.name)
-    def isCanbeOwned(self):
-        return self.canbeowned
-    def isHasPrice(self):
-        return self.hasprice
-    def isHasPieces(self):
-        return self.haspieces
-    def getPieces(self):
-        return self.playerson
-    def getTaxprice(self):
-        return self.taxprice
-    #methods
-    def Land(self, player1, player2=None, player3=None, player4=None):
-        self.haspieces = True
-        self.playerson = player1, player2, player3, player4
+            chancelist = startchancelist
+        drawn = random.choice(chancelist)
+        print("{}, you drew {}.".format(player.name, drawn))
+        del chancelist[drawn]
+        if drawn == 'Advance to Go':
+            go = classes[chancelist[drawn]]
+            player.moveTo(go)
+            player.collectGo()
+        elif drawn =='Advance to Illinois Avenue' or drawn == "Advance to St. Charles Place" or drawn == "Go to Reading Railroad" or drawn == "Go to Boardwalk":
+            prop=classes[chancelist[drawn]]
+            player.moveTo(prop)
+            buyProperty(player, prop)
+        elif drawn == 'Advance to a random Utility':
+            utility=random.choice(utilities)
 
-    def Leave(self, player1, player2=None, player3=None, player4=None):
-        self.playerson = self.playerson - player1, player2, player3, player4
-        if self.playerson == None:
-            self.haspieces = False
-    def ChargeTax(self):
-        return self.taxprice
+
+
+
+def getPos(x, y):
+    print("(",x , y,")")
+    return
+def drawBoard(comchest, chance, player, comp1, comp2, comp3, board):
+    global tile_list
+    #set background image
+    board.setup(700, 700, None, None)
+    board.bgpic("board.gif")
+    #draw community chest and chance
+    comchest.color("darkblue")
+    comchest.penup()
+    comchest.begin_fill()
+    comchest.setpos(-227, 133)
+    comchest.pendown()
+    comchest.setpos(-157, 62)
+    comchest.setpos(-56, 159)
+    comchest.setpos(-128, 229)
+    comchest.setpos(-227, 133)
+    comchest.end_fill()
+    chance.color("lightgreen")
+    chance.penup()
+    chance.begin_fill()
+    chance.setpos(128, -231)
+    chance.pendown()
+    chance.setpos(229, -135)
+    chance.setpos(155, -64)
+    chance.setpos(57, -164)
+    chance.setpos(128, -231)
+    chance.end_fill()
+    #set up players
+    player.penup()
+    player.speed(0)
+    player.setGo()
+    player.speed(1)
+    comp1.penup()
+    comp1.speed(0)
+    comp1.setGo()
+    comp1.speed(1)
+    comp2.penup()
+    comp2.speed(0)
+    comp2.setGo()
+    comp2.speed(1)
+    comp3.penup()
+    comp3.speed(0)
+    comp3.setGo()
+    comp3.speed(1)
+    #coord testing (will be removed eventually)
+    #board.onscreenclick(getPos)
+    #board.mainloop()
+def givebankamount(playerlist):
+    for n in playerlist:
+        print("{}, your bank balance is {}.".format(n, n.getBank()))
+def buyProperty(play, land):
+    if land.owned == False:
+        done = False
+        while not done:
+            buy = input("{}, would you like to buy {}? Enter Y for yes, N for no.".format(play.name, land.name))
+            if buy == 'Y' or buy == 'y':
+                play.buyProperty(land)
+                land.Buy(play)
+                done = True
+            elif buy == 'N' or buy == 'n':
+                print("{}, you did not buy {}.".format(play.name, land.name))
+                done = True
+            else:
+                print("Invalid input, try again.")
+    elif land.owned == True:
+        play.payRent(land)
+def unownedProperty(play, land):
+    if land.name == 'Chance':
+        0
+    elif land.name == 'Community Chest':
+        0
+    elif land.name == 'Luxury Tax' or land.name == 'Income Tax':
+        play.getTaxed(land)
+    elif land.name == 'Jail':
+        0
+    elif land.name == 'Just Visiting':
+        0
+    elif land.name == 'Go To Jail':
+        0
+    elif land.name == 'Free Parking':
+        print("{}, you landed on Free Parking! You get $100!".format(play.name))
+        play.addBank(100)
+    elif land.name == 'Go':
+        print("{}, you landed on Go! You get $200!".format(play.name))
+        play.collectGo()
+def makePlayer(shape):
+    global tile_list
+    name = 'Chloe'
+    # input("What is your name?")
+    color = 'black'
+    # input("What color would you like to be?")
+    t = Player(name, shape=shape, color=color, number2=0, number4=0)
+    t.name = name
+    return t
+def findWinner(playerlist):
+    currentw=0
+    for player in playerlist:
+        if player.bank > currentw:
+            currentw=player.bank
+    return currentw
+def playTurn(playerlist,bestplayer):
+    done = False
+    while not done:
+        for play in playerlist:
+            play.rollDice()
+        if bestplayer.bankrupt == True:
+            done = True
+            return
+        if playerlist == [bestplayer]:
+            done = True
+            return
+
+
 
 #not sure where these go yet:
 
@@ -593,25 +493,17 @@ ReadingRailRoad=Railroads(name='Reading Railroad',rentprice=[25,50,100,200], sel
 PennsylvaniaRailRoad=Railroads(name='Pennsylvania Railroad',rentprice=[25,50,100,200], sellprice=200, mortgageprice=100)
 BORailRoad=Railroads(name='B&O Railroad',rentprice=[25,50,100,200], sellprice=200, mortgageprice=100)
 ShortLineRailRoad=Railroads(name='Short Line Railroad',rentprice=[25,50,100,200], sellprice=200, mortgageprice=100)
-
+railroads=[ReadingRailRoad, PennsylvaniaRailRoad, BORailRoad, ShortLineRailRoad]
 #Chance/ComChest
 
-Chance=ChanceChest(name='Chance',numcards=16)
-chancedict={"Advance to Go":1, "Advance to Illinois Ave":2, "Advance to St. Charles Place":3,
-            "Advance to nearest Utility":4, "Advance to nearest Railroad":5, "Bank pays you $50":6,
-            "Get out of Jail Free":7,"Go back 3 Spaces":8, "Go to Jail":9, "House Repairs:House-25, Hotel-100":10,
-            "Poor Tax:$15":11,"Go to Reading Railroad":12, "Go to Boardwalk":13,
-            "Elected Chairman of the Board: Pay each player $50":14,"Building loan matures, collect $150":15,
-            "Won crossword competition, collect $100":16}
-Chance.AddDescriptions(chancedict)
-CommunityChest=ChanceChest(name='Community Chest',numcards=17)
-chestdict={"Advance to Go":1, "Bank Error:Collect $200":2, "Doctor's Fees:Pay $50":3, "Sale of Stock:Collect $50":4,
-           "Get out of Jail Free":5, "Go to Jail":6, "Grand Opera Night:Collect $50 from each player":7,
-           "Holiday Fund Matures:Collect $100":8, "Income Tax Refund:Collect $20":9,
-           "Bday! Collect $10 from each player":10,"Life insurance matures:Collect $100":11, "Hospital Fees:Pay $50":12,
-           "School Fees:Pay $50":13,"Consultancy Fee:Collect $25":14, "Street Repairs:Pay $40/house, $115/hotel":15,
-           "Second price in beauty contest:Collect $10":16, "Inherit $100":17}
-CommunityChest.AddDescriptions(chestdict)
+Chance1=Chance(name='Chance',numcards=16)
+Chance2=Chance(name='Chance', numcards=16)
+Chance3=Chance(name='Chance', numcards=16)
+
+CommunityChest1=Chest(name='Community Chest',numcards=17)
+CommunityChest2=Chest(name='Community Chest',numcards=17)
+CommunityChest3=Chest(name='Community Chest',numcards=17)
+
 
 #Tax
 LuxuryTax=Tax(name='Luxury Tax',taxprice=75)
@@ -619,6 +511,7 @@ IncomeTax=Tax(name='Income Tax',taxprice=200)
 
 #Misc.
 Jail=Tiles("Jail")
+JustVisiting=Tiles("Just Visiting")
 GotoJail=Tiles("Go To Jail")
 FreeParking=Tiles("Free Parking")
 Go=Tiles("Go")
@@ -633,33 +526,68 @@ classes={"mediterraneanavenue":MediterraneanAvenue, 'balticavenue':BalticAvenue,
          :ElectricCompany,'waterworks':WaterWorks,'readingrailroad':ReadingRailRoad,'pennsylvaniarailroad'
          :PennsylvaniaRailRoad,'b&orailroad':BORailRoad,'shortlinerailroad':ShortLineRailRoad}
 
-def givebankamount(name1, name2=None, name3=None, name4=None):
-        print("{}, your bank balance is {}.".format(name1, name1.getBank()))
-        print("{}, your bank balance is {}.".format(name2, name2.getBank()))
-        print("{}, your bank balance is {}.".format(name3, name3.getBank()))
-        print("{}, your bank balance is {}.".format(name4, name4.getBank()))
+tile_list={MediterraneanAvenue:[210, 240], CommunityChest1:[155, 185], BalticAvenue:[95, 130], IncomeTax:[40, 70],
+           ReadingRailRoad:[-20, 20], OrientalAvenue:[-70, -40], Chance1:[-130, -100], VermontAvenue:[-190, -150],
+           ConnecticutAvenue:[-250, -210], JustVisiting:[[-338, -270], [-338, -302], [-338, -332], [-293, -332]],
+           Jail:[[-312, -271], [-271, -271], [-312, -312], [-271, -312]],
+           StCharlesPlace:[[-291, -210], [-291, -240], [-335, -211], [-335, -238]], ElectricCompany:[-155, -185],
+           StatesAvenue:[-95, -126], VirginiaAvenue:[-38, -72],PennsylvaniaRailRoad:[21, -13], StJamesPlace:[73, 44],
+           CommunityChest2:[140, 100], TennesseeAvenue:[190, 150], NewYorkAvenue:[250, 210], FreeParking:[344, 301],
+           KentuckyAvenue:[-205, -245], Chance2:[-150, -190], IndianaAvenue:[-94, -130], IllinoisAvenue:[-35, -70],
+           BORailRoad:[17, -17], AtlanticAvenue:[70, 30], VetnorAvenue:[136, 95], WaterWorks:[190, 150],
+           MarvinGardens:[245, 204], GotoJail:[334, 295], PacificAvenue:[245, 212], NorthCarolinaAvenue:[185, 155],
+           CommunityChest3:[97, 132],PennsylvaniaAvenue:[30, 77], ShortLineRailRoad:[-20, 15], Chance3:[-76, -36],
+           ParkPlace:[-130, -95], LuxuryTax:[-185, -155], Boardwalk:[-244, -208],
+           Go:[[271, -293], [322, -293], [268, -320], [326, -320]]}
 
-def makePlayer(shape):
-    name=input("What is your name?")
-    color=input("What color would you like to be?")
-    t=Player(name, shape =shape, color =color)
-    t.name=name
-    return t
+tl=[Go, MediterraneanAvenue, CommunityChest1, BalticAvenue, IncomeTax, ReadingRailRoad, OrientalAvenue,
+                  Chance1, VermontAvenue, ConnecticutAvenue, JustVisiting, StCharlesPlace, ElectricCompany, StatesAvenue,
+                  VirginiaAvenue, PennsylvaniaRailRoad, StJamesPlace, CommunityChest2, TennesseeAvenue, NewYorkAvenue,
+                  FreeParking, KentuckyAvenue, Chance2, IndianaAvenue, IllinoisAvenue, BORailRoad, AtlanticAvenue,
+                  VetnorAvenue, WaterWorks, MarvinGardens, GotoJail, PacificAvenue, NorthCarolinaAvenue,
+                  CommunityChest3, PennsylvaniaAvenue, ShortLineRailRoad, Chance3, ParkPlace, LuxuryTax, Boardwalk]
+
+tile_list_x_bot={'y':[-293, -320],MediterraneanAvenue:[210, 240], CommunityChest1:[155, 185], BalticAvenue:[95, 130],
+           IncomeTax:[40, 70],ReadingRailRoad:[-20, 20], OrientalAvenue:[-70, -40], Chance1:[-130, -100],
+           VermontAvenue:[-190, -150],ConnecticutAvenue:[-250, -210]}
+
+tile_list_x_top={'y':[301, 334],KentuckyAvenue:[-205, -245], Chance2:[-150, -190], IndianaAvenue:[-94, -130],
+           IllinoisAvenue:[-35, -70],BORailRoad:[17, -17], AtlanticAvenue:[70, 30], VetnorAvenue:[136, 95],
+           WaterWorks:[190, 150], MarvinGardens:[245, 204], GotoJail:[334, 295]}
+
+tile_list_y_left={'x':[-291, -335], ElectricCompany:[-155, -185],StatesAvenue:[-95, -126], VirginiaAvenue:[-38, -72],
+           PennsylvaniaRailRoad:[21, -13], StJamesPlace:[73, 44],CommunityChest2:[140, 100], TennesseeAvenue:[190, 150],
+           NewYorkAvenue:[250, 210], FreeParking:[344, 301]}
+
+tile_list_y_right={'x':[295, 334], PacificAvenue:[245, 212], NorthCarolinaAvenue:[185, 155],
+           CommunityChest3:[97, 132],PennsylvaniaAvenue:[30, 77], ShortLineRailRoad:[-20, 15], Chance3:[-76, -36],
+           ParkPlace:[-130, -95], LuxuryTax:[-185, -155], Boardwalk:[-244, -208]}
+
+
 
 def mainGame():
     print("Welcome to Monopoly! Today you will be playing against 3 computer characters. Enjoy!")
     print("You are the turtle-shaped character.")
     player=makePlayer('turtle')
-    Comp1=Player('Comp1',shape='circle',color='blue')
-    Comp2=Player('Comp2',shape='square',color='red')
-    Comp3=Player('Comp3',shape='arrow',color='yellow')
+    Comp1 = Player('Comp1', shape='circle', color='blue', number2=0, number3=1, number4=1)
+    Comp2 = Player('Comp2', shape='square', color='red', number2=1, number4=2)
+    Comp3 = Player('Comp3', shape='arrow', color='yellow', number2=1, number3=0, number4=3)
+    playerlist=[player, Comp1, Comp2, Comp3]
     comchest = turtle.Turtle()
     chance = turtle.Turtle()
     board=turtle.Screen()
+    Go.playerson=playerlist
     print("Gotcha. Good choice! Now we'll set up the board...")
     drawBoard(comchest, chance, player, Comp1, Comp2, Comp3, board)
-    givebankamount(player, Comp1, Comp2, Comp3)
+    print("Let's start playing! Have fun!")
+    givebankamount(playerlist)
+    playTurn(playerlist, player)
+    winner=findWinner(playerlist)
+    print("Congrats {}, you have won the game!".format(winner))
+    print("These were the ending bank balances:{}".format(givebankamount(playerlist)))
     board.mainloop()
+
+
 
 
 
