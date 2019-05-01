@@ -7,9 +7,10 @@ class Utilities(Tiles):
         self.canbeowned = True
         self.hasprice = True
         self.rentprice = 40
-        self.pairs = None
+        self.pairs = []
         self.sellprice = sellprice
         self.mortgageprice = mortgageprice
+        self.islocation = False
         #changeables
         self.monopoly = False
         self.mortgaged = False
@@ -55,11 +56,14 @@ class Utilities(Tiles):
     def LooseMonopoly(self):
         self.monopoly = False
     def ChargeRent(self):
-        #tomult=self.rentprice[numowned - 1]
-        if self.monopoly==True:
+        if self.monopoly is True:
             return 80
-        return 40
+        else:
+            return 40
     def AddPairs(self, in1, in2=None, in3=None):
-        self.pairs = [in1, in2, in3]
+        optional = [in1, in2, in3]
+        for n in optional:
+            if n != None:
+                self.pairs.append(n)
         return self.pairs
 

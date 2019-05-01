@@ -10,6 +10,7 @@ class Railroads(Tiles):
         self.sellprice = sellprice
         self.mortgageprice = mortgageprice
         self.name=name
+        self.islocation = False
         # changeables
         self.monopoly = False
         self.mortgaged = False

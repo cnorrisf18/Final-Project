@@ -6,6 +6,7 @@ class Tiles:
         self.canbeowned = False
         self.hasprice = False
         self.haspieces = False
+        self.islocation = False
         self.name = name
         self.playerson = []
         self.sellprice = None
